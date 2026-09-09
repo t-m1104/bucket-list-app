@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>やりたいことリスト</title>
+</head>
+<body>
+    <h1>やりたいことリスト</h1>
+
+    <input type="text" id="titleInput" placeholder="やりたいことを入力">
+    <button onclick="addGoal()">追加</button>
+
+    <ul id="goalList"></ul>
+
+    <script>
+        async function fetchGoals() {
+            const response = await fetch("/goals");
+            const goals = await response.json();
+            const list = document.getElementById("goalList");
+            list.innerHTML = "";
+            goals.forEach(goal => {
+                const li = document.createElement("li");
+                li.textContent = goal.title;
+                list.appendChild(li);
+            });
+        }
+
+        async function addGoal() {
+            const input = document.getElementById("titleInput");
+            const title = input.value;
+            if (!title) return;
+
+            await fetch(`/goals?title=${encodeURIComponent(title)}`, {
+                method: "POST"
+            });
+
+            input.value = "";
+            fetchGoals();
+        }
+
+        fetchGoals();
+    </script>
+</body>
+</html>
