@@ -18,9 +18,28 @@
             const goals = await response.json();
             const list = document.getElementById("goalList");
             list.innerHTML = "";
+
             goals.forEach(goal => {
                 const li = document.createElement("li");
-                li.textContent = goal.title;
+
+                const span = document.createElement("span");
+                span.textContent = goal.title;
+                if (goal.achieved) {
+                    span.style.textDecoration = "line-through";
+                    span.style.color = "gray";
+                }
+                li.appendChild(span);
+
+                const achieveBtn = document.createElement("button");
+                achieveBtn.textContent = "達成!";
+                achieveBtn.onclick = () => achieveGoal(goal.id);
+                li.appendChild(achieveBtn);
+
+                const deleteBtn = document.createElement("button");
+                deleteBtn.textContent = "削除";
+                deleteBtn.onclick = () => deleteGoal(goal.id);
+                li.appendChild(deleteBtn);
+
                 list.appendChild(li);
             });
         }
@@ -35,6 +54,20 @@
             });
 
             input.value = "";
+            fetchGoals();
+        }
+
+        async function achieveGoal(id) {
+            await fetch(`/goals/${id}/achieve`, {
+                method: "PATCH"
+            });
+            fetchGoals();
+        }
+
+        async function deleteGoal(id) {
+            await fetch(`/goals/${id}`, {
+                method: "DELETE"
+            });
             fetchGoals();
         }
 
