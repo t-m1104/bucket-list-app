@@ -3,6 +3,7 @@ from sqlalchemy import create_engine, Column, Integer, String, Boolean
 from sqlalchemy.orm import sessionmaker, declarative_base
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from passlib.context import CryptContext
 
 # ---- DBの準備 ----
 DATABASE_URL = "sqlite:///./goals.db"
@@ -16,6 +17,16 @@ class Goal(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
     achieved = Column(Boolean, default=False)
+    
+    
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+class User(Base):
+    __tablename__ = "users"
+    id = Column(Integer, primary_key=True, index=True)
+    username = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
 
 # テーブルを実際に作る
 Base.metadata.create_all(bind=engine)
@@ -70,3 +81,32 @@ def delete_goal(goal_id: int):
         db.commit()
     db.close()
     return {"message": "削除しました"}
+
+@app.post("/register")
+def register(username: str, password: str):
+    db = SessionLocal()
+    existing_user = db.query(User).filter(User.username == username).first()
+    if existing_user:
+        db.close()
+        return {"error": "そのユーザー名はすでに使われています"}
+
+    hashed_password = pwd_context.hash(password)
+    new_user = User(username=username, hashed_password=hashed_password)
+    db.add(new_user)
+    db.commit()
+    db.close()
+    return {"message": f"{username}を登録しました"}
+
+@app.post("/login")
+def login(username: str, password: str):
+    db = SessionLocal()
+    user = db.query(User).filter(User.username == username).first()
+    db.close()
+
+    if not user:
+        return {"error": "ユーザーが見つかりません"}
+
+    if not pwd_context.verify(password, user.hashed_password):
+        return {"error": "パスワードが違います"}
+
+    return {"message": f"{username}さん、ログイン成功です!"}
