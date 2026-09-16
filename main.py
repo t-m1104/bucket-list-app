@@ -4,7 +4,10 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from passlib.context import CryptContext
-
+from datetime import datetime, timedelta
+from jose import jwt
+from fastapi import Header, HTTPException
+from fastapi import Depends
 # ---- DBの準備 ----
 DATABASE_URL = "sqlite:///./goals.db"
 engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
@@ -17,10 +20,34 @@ class Goal(Base):
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, index=True)
     achieved = Column(Boolean, default=False)
-    
+    owner = Column(String, index=True)   # ← この行を追加
+
     
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+SECRET_KEY = "kore-wa-himitsu-no-kagi-desu"  # 本来はもっと複雑な文字列にする
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
+
+def create_access_token(username: str):
+    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode = {"sub": username, "exp": expire}
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+from fastapi import Header, HTTPException
+
+def get_current_user(authorization: str = Header(None)):
+    if authorization is None:
+        raise HTTPException(status_code=401, detail="ログインしてください")
+
+    token = authorization.replace("Bearer ", "")
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username = payload.get("sub")
+        return username
+    except:
+        raise HTTPException(status_code=401, detail="無効なトークンです")
 
 class User(Base):
     __tablename__ = "users"
@@ -46,9 +73,9 @@ def read_root():
     return {"message": "Hello, やりたいことリスト!"}
 
 @app.post("/goals")
-def add_goal(title: str):
+def add_goal(title: str, current_user: str = Depends(get_current_user)):
     db = SessionLocal()
-    new_goal = Goal(title=title)
+    new_goal = Goal(title=title, owner=current_user)
     db.add(new_goal)
     db.commit()
     db.refresh(new_goal)
@@ -109,4 +136,5 @@ def login(username: str, password: str):
     if not pwd_context.verify(password, user.hashed_password):
         return {"error": "パスワードが違います"}
 
-    return {"message": f"{username}さん、ログイン成功です!"}
+    token = create_access_token(username)
+    return {"message": f"{username}さん、ログイン成功です!", "access_token": token}
