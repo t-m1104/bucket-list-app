@@ -35,19 +35,19 @@ def create_access_token(username: str):
     to_encode = {"sub": username, "exp": expire}
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-from fastapi import Header, HTTPException
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-def get_current_user(authorization: str = Header(None)):
-    if authorization is None:
-        raise HTTPException(status_code=401, detail="ログインしてください")
+security = HTTPBearer()
 
-    token = authorization.replace("Bearer ", "")
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username = payload.get("sub")
         return username
     except:
         raise HTTPException(status_code=401, detail="無効なトークンです")
+
 
 class User(Base):
     __tablename__ = "users"
